@@ -19,8 +19,8 @@ from utils.utils_signal import UtilsSignal
 from utils.utils_edges import UtilsEdges
 from utils.utils_metrics import MetricUtils
 from utils.utils_clustering import UtilsClustering
-from models.sagelstms_raw_plugin_agh_onehot_ew_recont_gcnlstmcnn_tparams import SageConvLSTMRawPluginAGHOneHotWRecGLCNNTParams
-from dataloaders.dl_eeg_raw_subgraph_plugiagh_onehot_xt_n60_org_precomp_swpfreqthresh_fstnorm import DLSubGPlgGAHNorm60OrgPSIAllSWPFreqThreshPreFstNorm
+from models.sagelstmdconv_agh import SageLSTM1DConvAGH
+from dataloaders.dl_agh_swpfreq import DLAGHPSISWPFreqThresh
 
 
 def torchOptimize():
@@ -35,8 +35,8 @@ def loadTrainTestData(srcdir, srcdircorr, srcdircorrswp, srcdir_swpfreqranges, s
     srcdir_train = srcdir + "train/"
     srcdir_test  = srcdir + "val/"
 
-    dataset_train = DLSubGPlgGAHNorm60OrgPSIAllSWPFreqThreshPreFstNorm(srcdir_train, srcdir_swpfreqranges, srcdircorr, srcdircorrswp, srccsv,  nodes, column=csvcol, swnlen=SEG)
-    dataset_test  = DLSubGPlgGAHNorm60OrgPSIAllSWPFreqThreshPreFstNorm(srcdir_test , srcdir_swpfreqranges, srcdircorr, srcdircorrswp, srccsv, nodes, column=csvcol, swnlen=SEG)
+    dataset_train = DLAGHPSISWPFreqThresh(srcdir_train, srcdir_swpfreqranges, srcdircorr, srcdircorrswp, srccsv,  nodes, column=csvcol, swnlen=SEG)
+    dataset_test  = DLAGHPSISWPFreqThresh(srcdir_test , srcdir_swpfreqranges, srcdircorr, srcdircorrswp, srccsv, nodes, column=csvcol, swnlen=SEG)
 
     # dataset_train = DLRaw(srcdir_train, srccsv, column=csvcol)
     # dataset_test  = DLRaw(srcdir_test, srccsv, column=csvcol)
@@ -313,7 +313,7 @@ def test(model, dataset, test_loader, BS, epoch, best_test, csvcol, modelprops, 
 
 def trainvalModel(modelpath, dataset, train_loader, test_loader, modelprops, csvcol, nds, i):
 
-    model = SageConvLSTMRawPluginAGHOneHotWRecGLCNNTParams(1, lenin=8500, BS=BS).to(device)
+    model = SageLSTM1DConvAGH(1, lenin=8500, BS=BS).to(device)
 
     if(model is not None):
         model = torch.load(modelpath)
