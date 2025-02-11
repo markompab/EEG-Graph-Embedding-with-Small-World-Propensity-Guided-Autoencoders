@@ -14,18 +14,19 @@ from torch_geometric.data import Data, Dataset
 
 from utils.utils_clustering import UtilsClustering
 from utils.utils_dl import DLUtils
+from utils.utils_lst import UtilsLst
 from utils.utils_tensor import UtilsTensor
 
 
-class DLSubGPlgGAHNorm60OrgPSIAllRecSWPThreshPreFst(Dataset):
-    def __init__(self, srcdir,  srcdircorrpre, srcdirswppre, srccsv, subggraph_nodes, column="iq", maxseqlen=8500, k=5, band="all", swnlen=5):
+class DLAGHPSISWPFreqThresh(Dataset):
+
+    def __init__(self, srcdir, srcdirsswpfreqranges, srcdircorrpre, srcdirswppre, srccsv, subggraph_nodes, column = "iq", maxseqlen = 8500, k = 5, band = "all", swnlen = 5):
+
         super().__init__(srcdir)
 
         self.srcdir = srcdir
         self.srccsv = srccsv
 
-        #self.data, self.slices = torch.load(self.processed_paths[0]
-        #self.data
         files = os.listdir(srcdir)
         files = [f.replace(".csv", "") for f in files]
 
@@ -42,17 +43,6 @@ class DLSubGPlgGAHNorm60OrgPSIAllRecSWPThreshPreFst(Dataset):
         self.maxage   = max(self.ages)
 
         self.k = k
-        #
-        # '''double'''
-        # a, b = "_1", "_2"
-        # seg_one = np.char.add(self.ids.tolist(), a)
-        # seg_two = np.char.add(self.ids.tolist(), b)
-        # self.ids     = np.hstack([seg_one, seg_two])
-        # self.ages    = np.hstack([self.ages, self.ages])
-        # self.genders = np.hstack([self.genders, self.genders])
-        # self.handed  = np.hstack([self.handed, self.handed])
-        # self.iqlabels = np.hstack([self.iqlabels, self.iqlabels])
-
         self.iqmax    = max(self.iqlabels)
         self.iqmin    = min(self.iqlabels)
 
@@ -67,6 +57,7 @@ class DLSubGPlgGAHNorm60OrgPSIAllRecSWPThreshPreFst(Dataset):
         self.swnlen = swnlen
         self.srcdircorrpre = srcdircorrpre
         self.srcdirswppre = srcdirswppre
+        self.srcdirsswpfreqranges = srcdirsswpfreqranges
 
 
     @property
@@ -85,16 +76,23 @@ class DLSubGPlgGAHNorm60OrgPSIAllRecSWPThreshPreFst(Dataset):
         if(self.ids[idx] in list(self.items.keys())):
             return self.items[self.ids[idx]]
 
-        #srcpath = "{}/{}.csv".format(self.srcdir, self.ids[idx][:-2])
         srcpath = "{}/{}.csv".format(self.srcdir, self.ids[idx])
+
+        # srcpath = "{}/{}.csv".format(self.srcdir, self.ids[idx][:-2])
 
         raweeg = pandas.read_csv(srcpath)
         raweeg = raweeg[self.subnodes]
 
         nodefeatures = torch.Tensor(raweeg.values)[:self.maxseqlen, :]
+        nodefeatures = torch.nn.functional.normalize(nodefeatures, dim=1)
+        nodefeatures = UtilsLst.replace_nan_and_inf(nodefeatures)
         nodefeatures = torch.swapaxes(nodefeatures, 0, 1)
 
         #edge_index, edge_attr = DLUtils.genEdgesPSI(nodefeatures, bands=self.band)
+        srcpathswpfreqranges = "{}/{}.npz".format(self.srcdirsswpfreqranges, self.ids[idx])
+        dt_swpfreq = np.load(srcpathswpfreqranges, allow_pickle=True)
+        swp_freqrange = torch.tensor(dt_swpfreq["swp_freqrange"])
+
         srcpathmeta = "{}/{}.npz".format(self.srcdircorrpre, self.ids[idx])
         dt = np.load(srcpathmeta, allow_pickle=True)
         edge_index, edge_attr = torch.tensor(dt["edge_index"]), torch.tensor(dt["edge_attr"])
@@ -105,9 +103,10 @@ class DLSubGPlgGAHNorm60OrgPSIAllRecSWPThreshPreFst(Dataset):
         age =torch.tensor(self.getAgeEncoding(self.ids[idx]), dtype=torch.float32)
         gender = torch.tensor(self.getGenderCode(self.genders[idx]), dtype=torch.float32)
         handed = torch.tensor(self.getHandedCode(self.handed[idx]), dtype=torch.float32)
-
         #klabels = self.getSpectralLabels(nodefeatures, self.k)
         #age = age/self.maxage
+
+        #swn_graph = self.getBstSWPGraph(edge_index, edge_attr, granularity=0.05)
         srcpathswp = "{}/{}.npz".format(self.srcdirswppre, self.ids[idx])
         swn_graph = self.getBstSWPGraph(srcpathswp)
 
@@ -123,6 +122,7 @@ class DLSubGPlgGAHNorm60OrgPSIAllRecSWPThreshPreFst(Dataset):
                 , 'age': age
                 , 'handed': handed
                 , 'swn_graph': swn_graph
+                , 'swp_freqrange': swp_freqrange
 
                 #, 'klabels': klabels
             }
@@ -195,7 +195,6 @@ class DLSubGPlgGAHNorm60OrgPSIAllRecSWPThreshPreFst(Dataset):
         return G
 
 
-
     def getBstSWPGraph(self, srcpathswpcorr):
         ''''''
         #edges, edge_attr = edges.detach().numpy().T, edge_attr.detach().numpy()
@@ -209,7 +208,6 @@ class DLSubGPlgGAHNorm60OrgPSIAllRecSWPThreshPreFst(Dataset):
         smn[:nds.shape[0]] = nds
 
         return smn
-
 
     def getAgeEncoding(self, strAge):
 
